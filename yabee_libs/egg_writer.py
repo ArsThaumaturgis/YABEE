@@ -647,6 +647,9 @@ class EGGMeshObjectData(EGGBaseObjectData):
                 if FORCE_EXPORT_VERTEX_COLORS or (mat and mat.use_vertex_color_paint):
                     col = self.colors_vtx_ref[vidx]
                     attributes.append('<RGBA> { %f %f %f %f }' % col[:])
+            elif FORCE_EXPORT_VERTEX_COLORS:
+                col = self.colors_vtx_ref[vidx]
+                attributes.append('<RGBA> { %f %f %f %f }' % col[:])
         if self.colors_vtx_aux_ref:
             # Don't write out additional vertex colors unless a material actually uses it.
             if face.material_index < len(self.obj_ref.data.materials):
@@ -655,6 +658,10 @@ class EGGMeshObjectData(EGGBaseObjectData):
                     for index, layer in enumerate(self.colors_vtx_aux_ref):
                         col = layer[vidx]
                         attributes.append('<Aux> extraColours' + str(index) + ' { %f %f %f %f }' % col[:])
+            elif FORCE_EXPORT_VERTEX_COLORS:
+                for index, layer in enumerate(self.colors_vtx_aux_ref):
+                    col = layer[vidx]
+                    attributes.append('<Aux> extraColours' + str(index) + ' { %f %f %f %f }' % col[:])
         return attributes
 
     def collect_vtx_uv(self, vidx, ividx, attributes):
