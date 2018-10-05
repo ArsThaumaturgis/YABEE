@@ -421,7 +421,7 @@ class EGGMeshObjectData(EGGBaseObjectData):
         EGGBaseObjectData.__init__(self, obj)
         self.poly_vtx_ref = self.pre_convert_poly_vtx_ref()
         self.smooth_vtx_list = self.get_smooth_vtx_list()
-        self.colors_vtx_ref = self.pre_convert_vtx_color()
+        self.colors_vtx_ref, self.colors_vtx_aux_ref = self.pre_convert_vtx_color()
         self.uvs_list = self.pre_convert_uvs()
         self.tangent_layers = None
         if CALC_TBS == 'BLENDER':
@@ -506,15 +506,29 @@ class EGGMeshObjectData(EGGBaseObjectData):
 
     def pre_convert_vtx_color(self):
         color_vtx_ref = []
-        if self.obj_ref.data.vertex_colors.active:
-            for col in self.obj_ref.data.vertex_colors.active.data:
-                color_vtx_ref.append(col.color) # We have one color per data color
-            #for fi, face in enumerate(self.obj_ref.data.polygons):
-            #    col = self.obj_ref.data.vertex_colors.active.data[fi]
-            #    col = col.color1[:], col.color2[:], col.color3[:], col.color4[:]
-            #    for vi, v in enumerate(face.vertices):
-            #        color_vtx_ref.append(col[vi])
-        return color_vtx_ref
+        colour_vtx_aux_ref = []
+        colourLayers = self.obj_ref.data.vertex_colors.values()
+        if len(colourLayers) > 1:
+            for index, col in enumerate(colourLayers[0].data):
+                color_vtx_ref.append((col.color[0], col.color[1], col.color[2],
+                                      colourLayers[1].data[index].color[0]))
+            if len(colourLayers) > 2:
+                for layer in colourLayers[2:]:
+                    aux_layer = []
+                    for col in layer.data:
+                        aux_layer.append((col.color[0], col.color[1], col.color[2], 1.0))
+                    colour_vtx_aux_ref.append(aux_layer)
+        else:
+            if self.obj_ref.data.vertex_colors.active:
+                for col in self.obj_ref.data.vertex_colors.active.data:
+                    #color_vtx_ref.append(col.color) # We have one color per data color
+                    color_vtx_ref.append((col.color[0], col.color[1], col.color[2], 1.0)) # We have one color per data color
+                #for fi, face in enumerate(self.obj_ref.data.polygons):
+                #    col = self.obj_ref.data.vertex_colors.active.data[fi]
+                #    col = col.color1[:], col.color2[:], col.color3[:], col.color4[:]
+                #    for vi, v in enumerate(face.vertices):
+                #        color_vtx_ref.append(col[vi])
+        return (color_vtx_ref, colour_vtx_aux_ref)
 
     def pre_calc_TBS(self):
         """ Use Blender internal algorythm to generate tangent and
@@ -632,7 +646,15 @@ class EGGMeshObjectData(EGGBaseObjectData):
                 mat = self.obj_ref.data.materials[face.material_index]
                 if FORCE_EXPORT_VERTEX_COLORS or (mat and mat.use_vertex_color_paint):
                     col = self.colors_vtx_ref[vidx]
-                    attributes.append('<RGBA> { %f %f %f 1.0 }' % col[:])
+                    attributes.append('<RGBA> { %f %f %f %f }' % col[:])
+        if self.colors_vtx_aux_ref:
+            # Don't write out additional vertex colors unless a material actually uses it.
+            if face.material_index < len(self.obj_ref.data.materials):
+                mat = self.obj_ref.data.materials[face.material_index]
+                if FORCE_EXPORT_VERTEX_COLORS or (mat and mat.use_vertex_color_paint):
+                    for index, layer in enumerate(self.colors_vtx_aux_ref):
+                        col = layer[vidx]
+                        attributes.append('<Aux> extraColours' + str(index) + ' { %f %f %f %f }' % col[:])
         return attributes
 
     def collect_vtx_uv(self, vidx, ividx, attributes):
